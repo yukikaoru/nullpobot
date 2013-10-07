@@ -1,4 +1,4 @@
-# -*- encoding: utf-8 -*-
+# encoding: utf-8
 require 'nkf'
 require 'json'
 require 'rexml/document'
@@ -21,8 +21,10 @@ module Nullporter
       5.times.reduce(nil) {|result, n|
         result || begin
           url = 'http://h.hatena.ne.jp/api/statuses/keyword_timeline.json?word=' + URI.encode(keyword) + '&page=' + (rand(15) + 1).to_s + '&count=20'
-          status = JSON::Parser.new(open(url).read).parse.select {|status| status['favorited'].to_i >= star_limit}.pick_random
-          status && status['text'].gsub(/^.+?=/, '')
+          open(url) {|io|
+            status = JSON::Parser.new(io.read).parse.select {|status| status['favorited'].to_i >= star_limit}.pick_random
+            status && status['text'].gsub(/^.+?=/, '')
+          }
         end
       }
     end
