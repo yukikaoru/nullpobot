@@ -40,12 +40,11 @@ defaults = {
   }
 }
 
-if ARGV[0]
-   config = symbolize_keys(YAML::load(File.read(ARGV[0])))
-   [:server, :local, :channel].each {|key|
-     config[key] = config[key] ? defaults[key].merge(config[key]) : defaults[key]
-   }
-end
+config_file = File.dirname(__FILE__) + '/config.yaml'
+config = symbolize_keys(YAML::load(File.read(config_file)))
+[:server, :local, :channel].each {|key|
+  config[key] = config[key] ? defaults[key].merge(config[key]) : defaults[key]
+}
 
 client = IRCClient.new(TCPSocket.open(config[:server][:host], config[:server][:port]), config[:server][:line_separator])
 
