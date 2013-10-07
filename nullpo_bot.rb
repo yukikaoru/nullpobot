@@ -1,4 +1,4 @@
-# -*- encoding: utf-8 -*-
+# encoding: utf-8
 require 'nkf'
 require 'json'
 require 'rexml/document'
@@ -10,19 +10,35 @@ class Array
     self[rand(self.length)]
   end
 end
+
 class Numeric
   def percent_do
     yield if rand * 100 < self
   end
 end
+
+def weekdays
+  {
+    :sunday => {:key => :sunday, :kanji => '日', :hiragana => 'にち'},
+    :monday => {:key => :monday, :kanji => '月', :hiragana => 'げつ'},
+    :tuesday => {:key => :tuesday, :kanji => '火', :hiragana => 'か'},
+    :wednesday => {:key => :wednesday, :kanji => '水', :hiragana => 'すい'},
+    :thursday => {:key => :thursday, :kanji => '木', :hiragana => 'もく'},
+    :friday => {:key => :friday, :kanji => '金', :hiragana => 'きん'},
+    :saturday => {:key => :saturday, :kanji => '土', :hiragana => 'ど'}
+  }
+end
+
 module Nullporter
   class << self
     def hatena_haiku(keyword, star_limit)
       5.times.reduce(nil) {|result, n|
         result || begin
           url = 'http://h.hatena.ne.jp/api/statuses/keyword_timeline.json?word=' + URI.encode(keyword) + '&page=' + (rand(15) + 1).to_s + '&count=20'
-          status = JSON::Parser.new(open(url).read).parse.select {|status| status['favorited'].to_i >= star_limit}.pick_random
-          status && status['text'].gsub(/^.+?=/, '')
+          open(url) {|io|
+            status = JSON::Parser.new(io.read).parse.select {|status| status['favorited'].to_i >= star_limit}.pick_random
+            status && status['text'].gsub(/^.+?=/, '')
+          }
         end
       }
     end
@@ -34,14 +50,30 @@ module Nullporter
         '偉いエラーです＞＜;'
       end
     end
-    def weather(day)
-      url = 'http://weather.livedoor.com/forecast/webservice/rest/v1?city=63&day=' + day
-      elements = REXML::Document.new(open(url)).elements
+    def weather_items
+      url = 'http://tenki.jp/component/static_api/rss/forecast/city_63.xml'
+      document = REXML::Document.new(open(url))
+      document.get_elements('/rss/channel/item')
+    end
+    def parse_weather(item)
+      title = item.get_elements('title').first.get_text.to_s
+      return nil unless title
+      match = /^.+\((.+)\)\s+(.+)\s+(.+)\/(.+)$/.match(title)
+      return nil unless match
       {
-        :telop => elements['lwws/telop'].text,
-        :max_temperature => elements['lwws/temperature/max/celsius'].text,
-        :min_temperature => elements['lwws/temperature/min/celsius'].text
+        :weekday => match[1],
+        :telop => match[2],
+        :max_temperature => match[3],
+        :min_temperature => match[4]
       }
+    end
+    def weather(offset_days)
+      item = weather_items[offset_days]
+      return nil unless item
+      parse_weather(item)
+    end
+    def weather_of_next_weekday(weekday)
+      weather_items.drop(1).map {|item| parse_weather(item)}.find {|weather| weather[:weekday] == weekdays[weekday][:kanji]}
     end
     def tepco
       url = 'http://tepco-usage-api.appspot.com/latest.json'
@@ -52,25 +84,38 @@ end
 module NullpoBrain
   class << self
     def weather(body)
-      case
-      when body =~ /明日|あした|あす/
-        day = 'tomorrow'
-        day_text = '明日'
-      when body =~ /明[々明]後日|しあさって/
-        return '明々後日はまだわからない＞＜'
-      when body =~ /明後日|あさって/
-        day = 'dayaftertomorrow'
-        day_text = '明後日'
-      when body =~ /昨日|きのう/
-        return '昨日のは忘れちゃった＞＜'
-      else
-        day = 'today'
-        day_text = '今日'
+      data = nil
+      match = /(次|つぎ|今度|こんど)の(月|火|水|木|金|土|日|げつ|か|すい|もく|きん|ど|にち)(曜|よう)(日|び)?の(天気|てんき)/.match(body)
+      if match
+        matched_weekday = match[2]
+        weekday = weekdays.values.find {|weekday|
+          weekday[:kanji] == matched_weekday || weekday[:hiragana] == matched_weekday
+        }
+        day_text = '次の' + weekday[:kanji] + '曜日'
+        data = Nullporter.weather_of_next_weekday(weekday[:key])
+      else 
+        case
+        when body =~ /明日|あした|あす/
+          offset_days = 1
+          day_text = '明日'
+        when body =~ /明[々明]後日|しあさって/
+          offset_days = 3
+          day_text = '明々後日'
+        when body =~ /明後日|あさって/
+          offset_days = 2
+          day_text = '明後日'
+        when body =~ /昨日|きのう/
+          return '昨日のは忘れちゃった＞＜'
+        else
+          offset_days = 0
+          day_text = '今日'
+        end
+        data = Nullporter.weather(offset_days)
       end
-      if (data = Nullporter.weather day)
+      if data
         (day_text + 'は' + data[:telop] + (data[:min_temperature] ? '、最低気温は' + data[:min_temperature].to_s + '度' : '') + (data[:max_temperature] ? '、最高気温は' + data[:max_temperature].to_s + '度' : '') + 'だよー')
       else
-        day_text + 'はまだわからない＞＜'
+        day_text + 'のはわかんない＞＜'
       end
     end
     def tepco
