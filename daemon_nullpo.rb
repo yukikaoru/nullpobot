@@ -1,3 +1,3 @@
 #!/usr/bin/env ruby
-Process.daemon
+Process.daemon(true)
 require_relative 'start_nullpo'
