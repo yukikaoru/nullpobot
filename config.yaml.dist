@@ -1,0 +1,13 @@
+server:
+    host: 127.0.0.1
+    port: 6667
+
+local:
+    user: 'nullpo-bot'
+    password: 'your password'
+    realname: 'nullpo-bot'
+    nickname: 'nullpo-bot'
+
+channel:
+    name '#channel'
+
