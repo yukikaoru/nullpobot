@@ -85,30 +85,39 @@ module NullpoBrain
   class << self
     def weather(body)
       data = nil
-      match = /(次|つぎ|今度|こんど)の(月|火|水|木|金|土|日|げつ|か|すい|もく|きん|ど|にち)(曜|よう)(日|び)?の(天気|てんき)/.match(body)
+      match = /(月|火|水|木|金|土|日|げつ|か|すい|もく|きん|ど|にち)(曜|よう)(日|び)?の(天気|てんき)/.match(body)
       if match
-        matched_weekday = match[2]
+        matched_weekday = match[1]
+        p matched_weekday
         weekday = weekdays.values.find {|weekday|
           weekday[:kanji] == matched_weekday || weekday[:hiragana] == matched_weekday
         }
-        day_text = '次の' + weekday[:kanji] + '曜日'
+        day_text = '今度の' + weekday[:kanji] + '曜日'
         data = Nullporter.weather_of_next_weekday(weekday[:key])
-      else 
-        case
-        when body =~ /明日|あした|あす/
-          offset_days = 1
-          day_text = '明日'
-        when body =~ /明[々明]後日|しあさって/
-          offset_days = 3
-          day_text = '明々後日'
-        when body =~ /明後日|あさって/
-          offset_days = 2
-          day_text = '明後日'
-        when body =~ /昨日|きのう/
-          return '昨日のは忘れちゃった＞＜'
+      else
+        match = /([1-9１２３４５６７８９一二三四五六七八九])(日後|にちご)の(天気|てんき)/.match(body)
+        if match
+          offset_days = {'1' => 1, '2' => 2, '3' => 3, '4' => 4, '5' => 5, '6' => 6, '7' => 7, '8' => 8, '9' => 9, '１' => 1, '２' => 2, '３' => 3, '４' => 4, '５' => 5, '６' => 6, '７' => 7, '８' => 8, '９' => 9, '一' => 1, '二' => 2, '三' => 3, '四' => 4, '五' => 5, '六' => 6, '七' => 7, '八' => 8, '九' => 9}[match[1]]
+          day_text = offset_days.to_s + '日後'
         else
-          offset_days = 0
-          day_text = '今日'
+          case
+          when body =~ /明日|あした|あす/
+            offset_days = 1
+            day_text = '明日'
+          when body =~ /明[々明]後日|しあさって/
+            offset_days = 3
+            day_text = '明々後日'
+          when body =~ /明後日|あさって/
+            offset_days = 2
+            day_text = '明後日'
+          when body =~ /一昨日|おととい/
+            return '一昨日のは知らない＞＜;'
+          when body =~ /昨日|きのう/
+            return '昨日のは忘れちゃった＞＜'
+          else
+            offset_days = 0
+            day_text = '今日'
+          end
         end
         data = Nullporter.weather(offset_days)
       end
